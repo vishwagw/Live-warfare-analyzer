@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warfare Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0a0a0a;
+            color: white;
+            min-height: 100vh;
+            line-height: 1.6;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Hacker-style world map background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                /* Grid pattern */
+                linear-gradient(rgba(0, 255, 100, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 100, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px, 50px 50px;
+            background-position: 0 0, 0 0;
+            z-index: -2;
+            opacity: 0.8;
+        }
+
+        /* Animated scanning lines */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(0, 255, 100, 0.02) 45%, 
+                rgba(0, 255, 100, 0.05) 50%, 
+                rgba(0, 255, 100, 0.02) 55%, 
+                transparent 100%);
+            z-index: -1;
+            animation: scan 4s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        /* Matrix-style code rain overlay */
+        .matrix-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .matrix-column {
+            position: absolute;
+            top: -100%;
+            font-family: monospace;
+            font-size: 10px;
+            color: #001100;
+            opacity: 0.3;
+            animation: matrix-fall 10s linear infinite;
+        }
+
+        @keyframes matrix-fall {
+            0% {
+                top: -100%;
+                opacity: 0.3;
+            }
+            10% {
+                opacity: 0.4;
+            }
+            90% {
+                opacity: 0.1;
+            }
+            100% {
+                top: 100vh;
+                opacity: 0;
+            }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+            position: relative;
+            background-color: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(1px);
+            border-radius: 0;
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
+        }
+
+        .header {
+            margin-bottom: 32px;
+            border-bottom: 1px solid rgba(0, 255, 100, 0.1);
+            padding-bottom: 16px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-title h1 {
+            font-size: 2rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 255, 100, 0.3);
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .last-updated {
+            font-size: 0.875rem;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 5px rgba(0, 255, 100, 0.5);
+        }
+
+        .refresh-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background-color: rgba(0, 255, 100, 0.1);
+            color: #00ff00;
+            border: 1px solid rgba(0, 255, 100, 0.3);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(0, 255, 100, 0.2);
+        }
+
+        .refresh-btn:hover {
+            background-color: rgba(0, 255, 100, 0.2);
+            box-shadow: 0 0 20px rgba(0, 255, 100, 0.4);
+            text-shadow: 0 0 10px rgba(0, 255, 100, 0.8);
+        }
+
+        .filters {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(0, 255, 100, 0.3);
+            border-radius: 4px;
+            padding: 8px 12px;
+            color: #00ff00;
+            font-size: 0.875rem;
+            font-family: 'Courier New', monospace;
+        }
+
+        .filter-select:focus {
+            border-color: rgba(0, 255, 100, 0.6);
+            box-shadow: 0 0 10px rgba(0, 255, 100, 0.3);
+            outline: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(0, 255, 100, 0.2);
+            border-radius: 8px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ff00, transparent);
+            animation: stat-scan 3s linear infinite;
+        }
+
+        @keyframes stat-scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .stat-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            color: #00ff00;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 32px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 16px;
+            font-family: 'Courier New', monospace;
+            color: #00ff00;
+            text-shadow: 0 0 10px rgba(0, 255, 100, 0.5);
+        }
+
+        .conflicts-section {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .conflict-card {
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(0, 255, 100, 0.2);
+            border-radius: 8px;
+            padding: 24px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .conflict-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                rgba(0, 255, 100, 0.3), 
+                rgba(255, 0, 0, 0.3), 
+                rgba(0, 255, 100, 0.3));
+        }
+
+        .conflict-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .conflict-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-family: 'Courier New', monospace;
+            color: #ffffff;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+        }
+
+        .conflict-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 0.875rem;
+            color: #00ff00;
+            flex-wrap: wrap;
+            font-family: 'Courier New', monospace;
+        }
+
+        .conflict-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .conflict-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .intensity-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .intensity-high { 
+            background-color: #ff0000; 
+            box-shadow: 0 0 15px #ff0000;
+        }
+        .intensity-medium { 
+            background-color: #ffaa00; 
+            box-shadow: 0 0 15px #ffaa00;
+        }
+        .intensity-low { 
+            background-color: #00ff00; 
+            box-shadow: 0 0 15px #00ff00;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+            border: 1px solid currentColor;
+            text-shadow: 0 0 10px currentColor;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .status-active { 
+            background-color: rgba(255, 0, 0, 0.1); 
+            color: #ff0000; 
+            border-color: #ff0000;
+        }
+        .status-monitoring { 
+            background-color: rgba(255, 170, 0, 0.1); 
+            color: #ffaa00; 
+            border-color: #ffaa00;
+        }
+        .status-resolved { 
+            background-color: rgba(0, 255, 0, 0.1); 
+            color: #00ff00; 
+            border-color: #00ff00;
+        }
+
+        .developments {
+            margin-bottom: 16px;
+        }
+
+        .developments h4 {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+        }
+
+        .developments ul {
+            list-style: none;
+        }
+
+        .developments li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+            color: #d1d5db;
+            margin-bottom: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .bullet-point {
+            width: 4px;
+            height: 4px;
+            background-color: #00ff00;
+            border-radius: 50%;
+            box-shadow: 0 0 5px #00ff00;
+        }
+
+        .casualties {
+            font-size: 0.875rem;
+            color: #ffaa00;
+            font-family: 'Courier New', monospace;
+        }
+
+        .news-section {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .news-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .news-item {
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(0, 255, 100, 0.2);
+            border-radius: 8px;
+            padding: 16px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .news-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .priority-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+            border: 1px solid currentColor;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .priority-high { 
+            background-color: rgba(255, 0, 0, 0.1); 
+            color: #ff0000; 
+            border-color: #ff0000;
+        }
+        .priority-medium { 
+            background-color: rgba(255, 170, 0, 0.1); 
+            color: #ffaa00; 
+            border-color: #ffaa00;
+        }
+
+        .news-time {
+            font-size: 0.75rem;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+        }
+
+        .news-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            margin-bottom: 8px;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+        }
+
+        .news-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+        }
+
+        .news-region {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .read-more {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 8px;
+            color: #00ff00;
+            text-decoration: none;
+            font-size: 0.75rem;
+            transition: all 0.3s;
+            font-family: 'Courier New', monospace;
+        }
+
+        .read-more:hover {
+            color: #ffffff;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        /* Enhanced map styles */
+        .map-container {
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(0, 255, 100, 0.3);
+            border-radius: 8px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .map-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 30% 30%, rgba(255, 0, 0, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 70% 60%, rgba(255, 170, 0, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 50% 80%, rgba(0, 255, 0, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .threat-map {
+            background-color: rgba(0, 20, 0, 0.5);
+            border: 1px solid rgba(0, 255, 100, 0.2);
+            border-radius: 8px;
+            height: 400px;
+            position: relative;
+            overflow: hidden;
+            background-image: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 20px,
+                    rgba(0, 255, 100, 0.03) 20px,
+                    rgba(0, 255, 100, 0.03) 21px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 20px,
+                    rgba(0, 255, 100, 0.03) 20px,
+                    rgba(0, 255, 100, 0.03) 21px
+                );
+        }
+
+        .map-world {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 500' fill='none'%3E%3Cpath d='M158 206c15-6 30-8 45-4 18 5 35 15 52 10 12-3 22-12 35-10 15 2 28 14 43 12 20-3 38-16 59-12 16 3 30 14 46 12 18-2 34-12 52-8 15 3 28 12 43 10 17-2 32-10 49-6 14 3 26 11 40 9 16-2 30-9 46-5' stroke='%23003300' stroke-width='1.5' opacity='0.6'/%3E%3Cpath d='M89 156c12-4 24-6 36-3 14 4 27 11 41 8 10-2 18-9 28-8 12 2 22 11 34 9 16-2 30-13 47-9 13 2 24 11 37 9 14-2 27-9 42-6 12 2 22 9 34 8 13-1 25-8 39-5 11 2 21 8 32 7 13-1 24-7 37-4' stroke='%23003300' stroke-width='1.5' opacity='0.5'/%3E%3Cpath d='M200 300c18-8 36-10 54-5 22 6 42 18 63 12 15-4 27-15 42-12 18 3 34 17 52 15 24-4 46-19 71-15 19 3 36 17 56 15 22-3 41-15 63-10 18 4 34 15 52 12 20-3 39-12 59-7 17 4 31 13 48 11 19-2 36-11 56-6' stroke='%23003300' stroke-width='1.5' opacity='0.7'/%3E%3Cpath d='M120 350c14-6 28-8 42-4 17 5 33 14 49 9 11-3 21-11 33-9 14 2 26 13 40 11 19-3 36-15 56-11 15 3 28 13 43 11 17-2 32-11 49-7 14 3 26 11 40 9 15-2 29-9 44-5 13 3 24 10 38 8 15-2 28-8 43-4' stroke='%23003300' stroke-width='1.5' opacity='0.6'/%3E%3C/svg%3E");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .conflict-marker {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            z-index: 10;
+            animation: marker-pulse 2s infinite;
+        }
+
+        @keyframes marker-pulse {
+            0%, 100% { 
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+            50% { 
+                opacity: 0.7;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+        }
+
+        .conflict-marker::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border-radius: 50%;
+            border: 1px solid currentColor;
+            opacity: 0.5;
+            animation: radar-ping 3s infinite;
+        }
+
+        @keyframes radar-ping {
+            0% {
+                transform: scale(1);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
+        .marker-high { color: #ff0000; }
+        .marker-medium { color: #ffaa00; }
+        .marker-low { color: #00ff00; }
+
+        .marker-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid currentColor;
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 0.75rem;
+            font-family: 'Courier New', monospace;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 20;
+            margin-bottom: 8px;
+        }
+
+        .conflict-marker:hover .marker-tooltip {
+            opacity: 1;
+        }
+
+        .map-legend {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+            font-size: 0.75rem;
+            flex-wrap: wrap;
+            font-family: 'Courier New', monospace;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #00ff00;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        .text-red-400 { color: #ff0000; text-shadow: 0 0 10px #ff0000; }
+        .text-yellow-400 { color: #ffaa00; text-shadow: 0 0 10px #ffaa00; }
+        .text-blue-400 { color: #0088ff; text-shadow: 0 0 10px #0088ff; }
+        .text-green-400 { color: #00ff00; text-shadow: 0 0 10px #00ff00; }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+            filter: drop-shadow(0 0 5px currentColor);
+        }
+
+        .icon-lg {
+            width: 32px;
+            height: 32px;
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+
+        .icon-sm {
+            width: 16px;
+            height: 16px;
+            filter: drop-shadow(0 0 3px currentColor);
+        }
+
+        .icon-xs {
+            width: 12px;
+            height: 12px;
+            filter: drop-shadow(0 0 2px currentColor);
+        }
+
+        /* Glitch effect for critical alerts */
+        .glitch {
+            animation: glitch 0.5s infinite;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        /* Scanning line effect for map */
+        .map-scan-line {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ff00, transparent);
+            animation: map-scan 6s linear infinite;
+            z-index: 5;
+        }
+
+        @keyframes map-scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Matrix code rain overlay -->
+    <div class="matrix-overlay" id="matrixOverlay"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-top">
+                <div class="header-title">
+                    <i data-feather="globe" class="icon-lg text-blue-400"></i>
+                    <h1>GLOBAL WARFARE ANALYZING SYSTEM</h1>
+                </div>
+                <div class="header-controls">
+                    <div class="last-updated" id="lastUpdated">
+                        LAST_UPDATE: <span id="updateTime"></span>
+                    </div>
+                    <button class="refresh-btn" onclick="refreshData()">
+                        <i data-feather="refresh-cw" class="icon-sm"></i>
+                        REFRESH
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters">
+                <i data-feather="filter" class="icon text-green-400"></i>
+                <select class="filter-select" id="regionFilter" onchange="applyFilters()">
+                    <option value="All">REGION: ALL</option>
+                    <option value="Eastern Europe">REGION: EASTERN_EUROPE</option>
+                    <option value="Middle East">REGION: MIDDLE_EAST</option>
+                    <option value="Southeast Asia">REGION: SOUTHEAST_ASIA</option>
+                    <option value="Northeast Africa">REGION: NORTHEAST_AFRICA</option>
+                </select>
+                <select class="filter-select" id="intensityFilter" onchange="applyFilters()">
+                    <option value="All">INTENSITY: ALL</option>
+                    <option value="High">INTENSITY: HIGH</option>
+                    <option value="Medium">INTENSITY: MEDIUM</option>
+                    <option value="Low">INTENSITY: LOW</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <h3 class="stat-title">ACTIVE_CONFLICTS</h3>
+                    <i data-feather="alert-triangle" class="icon text-red-400"></i>
+                </div>
+                <div class="stat-value text-red-400" id="activeCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <h3 class="stat-title">UNDER_MONITORING</h3>
+                    <i data-feather="clock" class="icon text-yellow-400"></i>
+                </div>
+                <div class="stat-value text-yellow-400" id="monitoringCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <h3 class="stat-title">HIGH_INTENSITY</h3>
+                    <div class="intensity-dot intensity-high"></div>
+                </div>
+                <div class="stat-value text-red-400" id="highIntensityCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <h3 class="stat-title">REGIONS_AFFECTED</h3>
+                    <i data-feather="map-pin" class="icon text-blue-400"></i>
+                </div>
+                <div class="stat-value text-blue-400" id="regionsCount">0</div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="main-grid">
+            <!-- Conflicts List -->
+            <div class="conflicts-section">
+                <h2 class="section-title">ACTIVE_CONFLICTS</h2>
+                <div id="conflictsList"></div>
+            </div>
+
+            <!-- News Feed and Map -->
+            <div class="news-section">
+                <h2 class="section-title">LATEST_INTEL</h2>
+                <div class="news-feed" id="newsFeed"></div>
+
+                <!-- Enhanced World Map -->
+                <div class="map-container">
+                    <h3 class="stat-title" style="margin-bottom: 16px;">GLOBAL_THREAT_MAP</h3>
+                    <div class="threat-map" id="threatMap">
+                        <div class="map-scan-line"></div>
+                        <div class="map-world" id="mapWorld">
+                            <!-- Conflict markers will be dynamically added here -->
+                        </div>
+                    </div>
+                    <div class="map-legend">
+                        <div class="legend-item">
+                            <div class="legend-dot intensity-high"></div>
+                            HIGH_THREAT
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot intensity-medium"></div>
+                            MED_THREAT
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot intensity-low"></div>
+                            LOW_THREAT
+                        </div>
+                        <div class="legend-item">
+                            <i data-feather="crosshair" class="icon-xs"></i>
+                            ACTIVE_ZONES
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Create matrix code rain effect
+        function createMatrixRain() {
+            const overlay = document.getElementById('matrixOverlay');
+            const chars = '01ÆÂ¿Â¡â„¢Â£Â¢âˆžÂ§Â¶â€¢ÂªÂºâ€"â‰ ';
+            
+            for (let i = 0; i < 30; i++) {
+                const column = document.createElement('div');
+                column.className = 'matrix-column';
+                column.style.left = Math.random() * 100 + 'vw';
+                column.style.animationDelay = Math.random() * 10 + 's';
+                column.style.animationDuration = (Math.random() * 10 + 10) + 's';
+                
+                let text = '';
+                for (let j = 0; j < 20; j++) {
+                    text += chars[Math.floor(Math.random() * chars.length)] + '<br>';
+                }
+                column.innerHTML = text;
+                
+                overlay.appendChild(column);
+            }
+        }
+
+        // Enhanced conflict data with precise coordinates
+        let activeConflicts = [
+            {
+                id: 1,
+                name: "Russia-Ukraine War",
+                region: "Eastern Europe",
+                status: "Active",
+                intensity: "High",
+                startDate: "2022-02-24",
+                coordinates: [49.8397, 24.0297], // Ukraine coordinates
+                mapPosition: { x: 55, y: 35 }, // Position on map (percentage)
+                lastUpdate: "2 hours ago",
+                casualties: "Ongoing assessment",
+                keyDevelopments: [
+                    "Continued fighting in eastern regions",
+                    "Humanitarian aid corridors established",
+                    "International sanctions maintained"
+                ]
+            },
+            {
+                id: 2,
+                name: "Gaza Conflict",
+                region: "Middle East",
+                status: "Monitoring",
+                intensity: "Medium",
+                startDate: "2023-10-07",
+                coordinates: [31.3547, 34.3088], // Gaza coordinates
+                mapPosition: { x: 52, y: 42 },
+                lastUpdate: "45 minutes ago",
+                casualties: "Under assessment",
+                keyDevelopments: [
+                    "Ceasefire negotiations ongoing",
+                    "Humanitarian aid distribution",
+                    "International mediation efforts"
+                ]
+            },
+            {
+                id: 3,
+                name: "Myanmar Civil Unrest",
+                region: "Southeast Asia",
+                status: "Active",
+                intensity: "Medium",
+                startDate: "2021-02-01",
+                coordinates: [19.7633, 96.0785], // Myanmar coordinates
+                mapPosition: { x: 78, y: 45 },
+                lastUpdate: "3 hours ago",
+                casualties: "Estimated thousands",
+                keyDevelopments: [
+                    "Resistance movements active",
+                    "Refugee displacement continues",
+                    "International sanctions imposed"
+                ]
+            },
+            {
+                id: 4,
+                name: "Sudan Conflict",
+                region: "Northeast Africa",
+                status: "Active",
+                intensity: "High",
+                startDate: "2023-04-15",
+                coordinates: [15.5007, 32.5599], // Sudan coordinates
+                mapPosition: { x: 48, y: 50 },
+                lastUpdate: "1 hour ago",
+                casualties: "Thousands displaced",
+                keyDevelopments: [
+                    "Fighting between military factions",
+                    "Civilian evacuation efforts",
+                    "Regional mediation attempts"
+                ]
+            },
+            {
+                id: 5,
+                name: "Syria Border Tensions",
+                region: "Middle East",
+                status: "Monitoring",
+                intensity: "Low",
+                startDate: "2023-01-15",
+                coordinates: [34.8021, 38.9968], // Syria coordinates
+                mapPosition: { x: 53, y: 38 },
+                lastUpdate: "6 hours ago",
+                casualties: "Limited reports",
+                keyDevelopments: [
+                    "Cross-border incidents reported",
+                    "Diplomatic communications active",
+                    "UN observers deployed"
+                ]
+            },
+            {
+                id: 6,
+                name: "Mali Security Crisis",
+                region: "West Africa",
+                status: "Active",
+                intensity: "Medium",
+                startDate: "2023-03-10",
+                coordinates: [17.5707, -3.9962], // Mali coordinates
+                mapPosition: { x: 42, y: 48 },
+                lastUpdate: "4 hours ago",
+                casualties: "Multiple casualties",
+                keyDevelopments: [
+                    "Peacekeeping operations ongoing",
+                    "Regional coalition formed",
+                    "Counter-terrorism efforts intensified"
+                ]
+            }
+        ];
+
+        let newsHeadlines = [
+            {
+                id: 1,
+                title: "International Peacekeeping Forces Deploy to Border Region",
+                source: "Reuters",
+                timestamp: "1 hour ago",
+                region: "Eastern Europe",
+                priority: "High"
+            },
+            {
+                id: 2,
+                title: "Humanitarian Aid Reaches Affected Civilian Areas",
+                source: "BBC News",
+                timestamp: "2 hours ago",
+                region: "Middle East",
+                priority: "Medium"
+            },
+            {
+                id: 3,
+                title: "Regional Leaders Call for Emergency Summit",
+                source: "Al Jazeera",
+                timestamp: "3 hours ago",
+                region: "Northeast Africa",
+                priority: "High"
+            },
+            {
+                id: 4,
+                title: "Sanctions Package Approved by International Coalition",
+                source: "CNN",
+                timestamp: "4 hours ago",
+                region: "Southeast Asia",
+                priority: "Medium"
+            },
+            {
+                id: 5,
+                title: "UN Security Council Holds Emergency Session",
+                source: "Associated Press",
+                timestamp: "5 hours ago",
+                region: "West Africa",
+                priority: "High"
+            },
+            {
+                id: 6,
+                title: "Diplomatic Breakthrough in Peace Negotiations",
+                source: "France 24",
+                timestamp: "6 hours ago",
+                region: "Middle East",
+                priority: "Medium"
+            }
+        ];
+
+        // Utility functions
+        function getIntensityClass(intensity) {
+            switch (intensity) {
+                case 'High': return 'intensity-high';
+                case 'Medium': return 'intensity-medium';
+                case 'Low': return 'intensity-low';
+                default: return 'intensity-medium';
+            }
+        }
+
+        function getMarkerClass(intensity) {
+            switch (intensity) {
+                case 'High': return 'marker-high';
+                case 'Medium': return 'marker-medium';
+                case 'Low': return 'marker-low';
+                default: return 'marker-medium';
+            }
+        }
+
+        function getStatusClass(status) {
+            switch (status) {
+                case 'Active': return 'status-active';
+                case 'Monitoring': return 'status-monitoring';
+                case 'Resolved': return 'status-resolved';
+                default: return 'status-active';
+            }
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString();
+        }
+
+        // Enhanced map rendering
+        function renderThreatMap() {
+            const mapWorld = document.getElementById('mapWorld');
+            
+            // Clear existing markers
+            mapWorld.innerHTML = '';
+            
+            // Filter conflicts based on current filters
+            const regionFilter = document.getElementById('regionFilter').value;
+            const intensityFilter = document.getElementById('intensityFilter').value;
+            
+            const filteredConflicts = activeConflicts.filter(conflict => {
+                const regionMatch = regionFilter === 'All' || conflict.region === regionFilter;
+                const intensityMatch = intensityFilter === 'All' || conflict.intensity === intensityFilter;
+                return regionMatch && intensityMatch;
+            });
+
+            // Add conflict markers to map
+            filteredConflicts.forEach(conflict => {
+                const marker = document.createElement('div');
+                marker.className = `conflict-marker ${getMarkerClass(conflict.intensity)}`;
+                marker.style.left = conflict.mapPosition.x + '%';
+                marker.style.top = conflict.mapPosition.y + '%';
+                
+                // Create tooltip
+                const tooltip = document.createElement('div');
+                tooltip.className = 'marker-tooltip';
+                tooltip.innerHTML = `
+                    <div style="color: currentColor; font-weight: bold;">${conflict.name.toUpperCase()}</div>
+                    <div style="font-size: 0.7rem; margin-top: 2px;">
+                        STATUS: ${conflict.status.toUpperCase()} | 
+                        INTENSITY: ${conflict.intensity.toUpperCase()}
+                    </div>
+                    <div style="font-size: 0.7rem;">UPDATED: ${conflict.lastUpdate.toUpperCase()}</div>
+                `;
+                
+                marker.appendChild(tooltip);
+                mapWorld.appendChild(marker);
+                
+                // Add click interaction
+                marker.addEventListener('click', () => {
+                    showConflictDetails(conflict);
+                });
+            });
+        }
+
+        function showConflictDetails(conflict) {
+            // Add a glitch effect to the clicked marker
+            const markers = document.querySelectorAll('.conflict-marker');
+            markers.forEach(marker => {
+                if (marker.style.left === conflict.mapPosition.x + '%' && 
+                    marker.style.top === conflict.mapPosition.y + '%') {
+                    marker.classList.add('glitch');
+                    setTimeout(() => marker.classList.remove('glitch'), 1000);
+                }
+            });
+            
+            // Log details in console (hacker style)
+            console.log('=== CONFLICT DETAILS ACCESSED ===');
+            console.log(`TARGET: ${conflict.name.toUpperCase()}`);
+            console.log(`REGION: ${conflict.region.toUpperCase()}`);
+            console.log(`THREAT_LEVEL: ${conflict.intensity.toUpperCase()}`);
+            console.log(`COORDINATES: [${conflict.coordinates[0]}, ${conflict.coordinates[1]}]`);
+            console.log(`STATUS: ${conflict.status.toUpperCase()}`);
+            console.log('=== ACCESS COMPLETE ===');
+        }
+
+        // Render functions
+        function renderConflicts() {
+            const regionFilter = document.getElementById('regionFilter').value;
+            const intensityFilter = document.getElementById('intensityFilter').value;
+            
+            const filteredConflicts = activeConflicts.filter(conflict => {
+                const regionMatch = regionFilter === 'All' || conflict.region === regionFilter;
+                const intensityMatch = intensityFilter === 'All' || conflict.intensity === intensityFilter;
+                return regionMatch && intensityMatch;
+            });
+
+            const conflictsList = document.getElementById('conflictsList');
+            conflictsList.innerHTML = filteredConflicts.map(conflict => `
+                <div class="conflict-card ${conflict.intensity === 'High' ? 'glitch' : ''}">
+                    <div class="conflict-header">
+                        <div>
+                            <h3 class="conflict-title">${conflict.name.toUpperCase().replace(/ /g, '_')}</h3>
+                            <div class="conflict-meta">
+                                <span>
+                                    <i data-feather="map-pin" class="icon-xs"></i>
+                                    ${conflict.region.toUpperCase().replace(/ /g, '_')}
+                                </span>
+                                <span>START_DATE: ${formatDate(conflict.startDate)}</span>
+                                <span>LAST_UPDATE: ${conflict.lastUpdate}</span>
+                            </div>
+                        </div>
+                        <div class="conflict-status">
+                            <div class="intensity-dot ${getIntensityClass(conflict.intensity)}"></div>
+                            <span class="status-badge ${getStatusClass(conflict.status)}">
+                                ${conflict.status.toUpperCase()}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="developments">
+                        <h4>KEY_DEVELOPMENTS:</h4>
+                        <ul>
+                            ${conflict.keyDevelopments.map(dev => `
+                                <li>
+                                    <div class="bullet-point"></div>
+                                    ${dev.toUpperCase()}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="casualties">
+                        <strong>CASUALTIES/IMPACT:</strong> ${conflict.casualties.toUpperCase()}
+                    </div>
+                </div>
+            `).join('');
+
+            // Re-initialize feather icons for new content
+            feather.replace();
+            
+            // Update map markers
+            renderThreatMap();
+        }
+
+        function renderNews() {
+            const newsFeed = document.getElementById('newsFeed');
+            newsFeed.innerHTML = newsHeadlines.map(news => `
+                <div class="news-item">
+                    <div class="news-header">
+                        <span class="priority-badge priority-${news.priority.toLowerCase()}">
+                            ${news.priority.toUpperCase()}_PRIORITY
+                        </span>
+                        <span class="news-time">${news.timestamp.toUpperCase().replace(/ /g, '_')}</span>
+                    </div>
+                    
+                    <h3 class="news-title">${news.title.toUpperCase()}</h3>
+                    
+                    <div class="news-footer">
+                        <span>SOURCE: ${news.source.toUpperCase()}</span>
+                        <div class="news-region">
+                            <i data-feather="map-pin" class="icon-xs"></i>
+                            ${news.region.toUpperCase().replace(/ /g, '_')}
+                        </div>
+                    </div>
+                    
+                    <a href="#" class="read-more">
+                        ACCESS_FULL_INTEL <i data-feather="external-link" class="icon-xs"></i>
+                    </a>
+                </div>
+            `).join('');
+
+            // Re-initialize feather icons for new content
+            feather.replace();
+        }
+
+        function updateStats() {
+            const activeCount = activeConflicts.filter(c => c.status === 'Active').length;
+            const monitoringCount = activeConflicts.filter(c => c.status === 'Monitoring').length;
+            const highIntensityCount = activeConflicts.filter(c => c.intensity === 'High').length;
+            const regionsCount = new Set(activeConflicts.map(c => c.region)).size;
+
+            document.getElementById('activeCount').textContent = activeCount.toString().padStart(2, '0');
+            document.getElementById('monitoringCount').textContent = monitoringCount.toString().padStart(2, '0');
+            document.getElementById('highIntensityCount').textContent = highIntensityCount.toString().padStart(2, '0');
+            document.getElementById('regionsCount').textContent = regionsCount.toString().padStart(2, '0');
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            document.getElementById('updateTime').textContent = timeString.replace(/:/g, ':');
+        }
+
+        // Event handlers
+        function applyFilters() {
+            renderConflicts();
+            renderThreatMap();
+        }
+
+        function refreshData() {
+            updateTime();
+            // Simulate data refresh with enhanced hacker-style animation
+            console.log('=== SYSTEM REFRESH INITIATED ===');
+            console.log('ACCESSING_SECURE_CHANNELS...');
+            console.log('DECRYPTING_INTEL_PACKETS...');
+            console.log('UPDATING_THREAT_MATRIX...');
+            console.log('RECALIBRATING_SENSORS...');
+            console.log('=== DATA_REFRESH_COMPLETE ===');
+            
+            // Add enhanced glitch effect to the refresh button
+            const refreshBtn = document.querySelector('.refresh-btn');
+            refreshBtn.classList.add('glitch');
+            refreshBtn.style.opacity = '0.7';
+            
+            // Simulate map update
+            const threatMap = document.getElementById('threatMap');
+            threatMap.style.filter = 'brightness(1.5) saturate(1.3)';
+            
+            setTimeout(() => {
+                refreshBtn.style.opacity = '1';
+                refreshBtn.classList.remove('glitch');
+                threatMap.style.filter = 'none';
+                
+                // Refresh all components
+                renderConflicts();
+                renderNews();
+                renderThreatMap();
+            }, 1200);
+        }
+
+        // Enhanced random effects
+        function triggerRandomGlitch() {
+            const elements = document.querySelectorAll('.conflict-card, .news-item, .conflict-marker');
+            if (elements.length > 0) {
+                const randomElement = elements[Math.floor(Math.random() * elements.length)];
+                randomElement.classList.add('glitch');
+                setTimeout(() => {
+                    randomElement.classList.remove('glitch');
+                }, 500);
+            }
+        }
+
+        function simulateMapActivity() {
+            const markers = document.querySelectorAll('.conflict-marker');
+            markers.forEach(marker => {
+                if (Math.random() < 0.1) { // 10% chance
+                    marker.style.filter = 'brightness(2) saturate(2)';
+                    setTimeout(() => {
+                        marker.style.filter = '';
+                    }, 2000);
+                }
+            });
+        }
+
+        // Initialize the application
+        function init() {
+            createMatrixRain();
+            updateTime();
+            updateStats();
+            renderConflicts();
+            renderNews();
+            renderThreatMap();
+            
+            // Initialize feather icons
+            feather.replace();
+            
+            // Update time every second for that real-time feel
+            setInterval(updateTime, 1000);
+            
+            // Random glitch effects every 10-30 seconds
+            setInterval(triggerRandomGlitch, Math.random() * 20000 + 10000);
+            
+            // Simulate map activity every 5-15 seconds
+            setInterval(simulateMapActivity, Math.random() * 10000 + 5000);
+            
+            // Log initialization
+            console.log('=== GLOBAL THREAT MONITORING SYSTEM ONLINE ===');
+            console.log('ALL_SYSTEMS_OPERATIONAL');
+            console.log('THREAT_MATRIX_ACTIVE');
+            console.log('REAL_TIME_MONITORING_ENABLED');
+            console.log('=== SYSTEM_READY ===');
+        }
+
+        // Start the application when the DOM is loaded
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
